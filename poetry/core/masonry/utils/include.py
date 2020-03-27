@@ -46,3 +46,24 @@ class Include(object):
         self._elements = sorted(list(self._base.glob(self._include)))
 
         return self
+
+
+class IncludeFile:
+    def __init__(
+        self,
+        path,  # type: Path
+        source_root=None,  # type: Optional[Path]
+    ):
+        self.path = path
+        self.source_root = source_root or Path(".")
+
+    def __repr__(self):  # type: () -> str
+        return str(self.path)
+
+    @property
+    def rel_path(self):  # type: () -> Path
+        return self.path
+
+    @property
+    def full_path(self):  # type: () -> Path
+        return self.source_root / self.path

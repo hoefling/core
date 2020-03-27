@@ -6,6 +6,7 @@ import tempfile
 
 from collections import defaultdict
 from contextlib import contextmanager
+from typing import List
 from typing import Set
 from typing import Union
 
@@ -16,6 +17,7 @@ from poetry.core.utils._compat import to_str
 from poetry.core.vcs import get_vcs
 
 from ..metadata import Metadata
+from ..utils.include import IncludeFile
 from ..utils.module import Module
 from ..utils.package_include import PackageInclude
 
@@ -61,11 +63,25 @@ class Builder(object):
 
             packages.append(p)
 
+        includes = []
+        for i in self._package.include:
+            formats = i.get("format", [])
+
+            if (
+                formats
+                and self.format
+                and self.format not in formats
+                and not ignore_packages_formats
+            ):
+                continue
+
+            includes.append(i)
+
         self._module = Module(
             self._package.name,
             self._path.as_posix(),
             packages=packages,
-            includes=self._package.include,
+            includes=includes,
         )
         self._meta = Metadata.from_package(self._package)
 
@@ -115,21 +131,48 @@ class Builder(object):
 
         return False
 
-    def find_files_to_add(self, exclude_build=True):  # type: (bool) -> list
+    def find_files_to_add(
+        self, exclude_build=True
+    ):  # type: (bool) -> List[IncludeFile]
         """
         Finds all files to add to the tarball
         """
         to_add = []
 
         for include in self._module.includes:
+            include.refresh()
+            formats = include.formats or ["sdist"]
+
             for file in include.elements:
                 if "__pycache__" in str(file):
                     continue
 
                 if file.is_dir():
+                    if self.format in formats:
+                        for f in file.glob("**/*"):
+                            rel_path = f.relative_to(self._path)
+
+                            if (
+                                rel_path not in set([t.path for t in to_add])
+                                and not f.is_dir()
+                                and not self.is_excluded(rel_path)
+                            ):
+                                to_add.append(
+                                    IncludeFile(path=rel_path, source_root=self._path)
+                                )
                     continue
 
-                file = file.relative_to(self._path)
+                if (
+                    isinstance(include, PackageInclude)
+                    and include.source
+                    and self.format == "wheel"
+                ):
+                    source_root = include.base
+                else:
+                    source_root = self._path
+
+                file = file.relative_to(source_root)
+                include_file = IncludeFile(path=file, source_root=source_root.resolve())
 
                 if self.is_excluded(file) and isinstance(include, PackageInclude):
                     continue
@@ -137,36 +180,21 @@ class Builder(object):
                 if file.suffix == ".pyc":
                     continue
 
-                if file in to_add:
+                if file in set([f.path for f in to_add]):
                     # Skip duplicates
                     continue
 
                 logger.debug(" - Adding: {}".format(str(file)))
-                to_add.append(file)
+                to_add.append(include_file)
 
-        # Include project files
-        logger.debug(" - Adding: pyproject.toml")
-        to_add.append(Path("pyproject.toml"))
-
-        # If a license file exists, add it
-        for license_file in self._path.glob("LICENSE*"):
-            logger.debug(" - Adding: {}".format(license_file.relative_to(self._path)))
-            to_add.append(license_file.relative_to(self._path))
-
-        # If a README is specified we need to include it
-        # to avoid errors
-        if "readme" in self._poetry.local_config:
-            readme = self._path / self._poetry.local_config["readme"]
-            if readme.exists():
-                logger.debug(" - Adding: {}".format(readme.relative_to(self._path)))
-                to_add.append(readme.relative_to(self._path))
-
-        # If a build script is specified and explicitely required
+        # If a build script is specified and explicitly required
         # we add it to the list of files
         if self._package.build and not exclude_build:
-            to_add.append(Path(self._package.build))
+            to_add.append(
+                IncludeFile(path=Path(self._package.build), source_root=self._path)
+            )
 
-        return sorted(to_add)
+        return to_add
 
     def get_metadata_content(self):  # type: () -> bytes
         content = METADATA_BASE.format(

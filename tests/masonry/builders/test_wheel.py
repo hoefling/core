@@ -155,3 +155,16 @@ def test_dist_info_file_permissions():
             z.getinfo("my_package-1.2.3.dist-info/entry_points.txt").external_attr
             == 0o644 << 16
         )
+
+
+def test_wheel_includes_inline_table():
+    module_path = fixtures_dir / "with_include_inline_table"
+    WheelBuilder.make(Factory().create_poetry(module_path))
+
+    whl = module_path / "dist" / "with_include-1.2.3-py3-none-any.whl"
+
+    assert whl.exists()
+
+    with zipfile.ZipFile(str(whl)) as z:
+        assert "wheel_only.txt" in z.namelist()
+        assert "notes.txt" not in z.namelist()
