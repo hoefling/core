@@ -21,9 +21,8 @@ from poetry.core.utils._compat import encode
 from poetry.core.utils._compat import to_str
 
 from ..utils.helpers import normalize_file_permissions
-from ..utils.include import IncludeFile
 from ..utils.package_include import PackageInclude
-from .builder import Builder
+from .builder import Builder, BuildIncludeFile
 
 
 SETUP = """\
@@ -77,9 +76,9 @@ class SdistBuilder(Builder):
             files_to_add = self.find_files_to_add(exclude_build=False)
 
             for file in files_to_add:
-                path = file.full_path
+                path = file.resolve()
                 tar_info = tar.gettarinfo(
-                    str(path), arcname=pjoin(tar_dir, str(file.rel_path))
+                    str(path), arcname=pjoin(tar_dir, str(file.relative_path))
                 )
                 tar_info = self.clean_tarinfo(tar_info)
 
@@ -304,32 +303,29 @@ class SdistBuilder(Builder):
 
     def find_files_to_add(
         self, exclude_build=False
-    ):  # type: (bool) -> List[IncludeFile]
+    ):  # type: (bool) -> List[BuildIncludeFile]
         to_add = super(SdistBuilder, self).find_files_to_add(exclude_build)
 
         # Include project files
         logger.debug(" - Adding: pyproject.toml")
-        to_add.append(IncludeFile(path=Path("pyproject.toml"), source_root=self._path))
+        to_add.append(
+            BuildIncludeFile(path=Path("pyproject.toml"), parent=self._path)
+        )
 
         # If a license file exists, add it
         for license_file in self._path.glob("LICENSE*"):
             logger.debug(" - Adding: {}".format(license_file.relative_to(self._path)))
             to_add.append(
-                IncludeFile(
-                    path=license_file.relative_to(self._path), source_root=self._path
-                )
+                BuildIncludeFile(path=license_file.relative_to(self._path), parent=self._path)
             )
 
-        # If a README is specified we need to include it
-        # to avoid errors
+        # If a README is specified we need to include it to avoid errors
         if "readme" in self._poetry.local_config:
             readme = self._path / self._poetry.local_config["readme"]
             if readme.exists():
                 logger.debug(" - Adding: {}".format(readme.relative_to(self._path)))
                 to_add.append(
-                    IncludeFile(
-                        path=readme.relative_to(self._path), source_root=self._path
-                    )
+                    BuildIncludeFile(path=readme.relative_to(self._path), parent=self._path)
                 )
 
         return sorted(to_add, key=lambda x: x.path)

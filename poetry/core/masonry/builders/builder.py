@@ -17,7 +17,6 @@ from poetry.core.utils._compat import to_str
 from poetry.core.vcs import get_vcs
 
 from ..metadata import Metadata
-from ..utils.include import IncludeFile
 from ..utils.module import Module
 from ..utils.package_include import PackageInclude
 
@@ -64,8 +63,8 @@ class Builder(object):
             packages.append(p)
 
         includes = []
-        for i in self._package.include:
-            formats = i.get("format", [])
+        for include in self._package.include:
+            formats = include.get("format", [])
 
             if (
                 formats
@@ -75,7 +74,7 @@ class Builder(object):
             ):
                 continue
 
-            includes.append(i)
+            includes.append(include)
 
         self._module = Module(
             self._package.name,
@@ -133,7 +132,7 @@ class Builder(object):
 
     def find_files_to_add(
         self, exclude_build=True
-    ):  # type: (bool) -> List[IncludeFile]
+    ):  # type: (bool) -> List[BuildIncludeFile]
         """
         Finds all files to add to the tarball
         """
@@ -153,12 +152,12 @@ class Builder(object):
                             rel_path = f.relative_to(self._path)
 
                             if (
-                                rel_path not in set([t.path for t in to_add])
+                                rel_path not in set([f.path for f in to_add])
                                 and not f.is_dir()
                                 and not self.is_excluded(rel_path)
                             ):
                                 to_add.append(
-                                    IncludeFile(path=rel_path, source_root=self._path)
+                                    BuildIncludeFile(path=rel_path, parent=self._path)
                                 )
                     continue
 
@@ -172,7 +171,7 @@ class Builder(object):
                     source_root = self._path
 
                 file = file.relative_to(source_root)
-                include_file = IncludeFile(path=file, source_root=source_root.resolve())
+                include_file = BuildIncludeFile(path=file, parent=source_root.resolve())
 
                 if self.is_excluded(file) and isinstance(include, PackageInclude):
                     continue
@@ -191,7 +190,7 @@ class Builder(object):
         # we add it to the list of files
         if self._package.build and not exclude_build:
             to_add.append(
-                IncludeFile(path=Path(self._package.build), source_root=self._path)
+                BuildIncludeFile(path=Path(self._package.build), parent=self._path)
             )
 
         return to_add
@@ -298,3 +297,21 @@ class Builder(object):
             yield name
 
             shutil.rmtree(name)
+
+
+class BuildIncludeFile:
+    def __init__(self, path, parent=None):
+        self.path = path
+        self.parent = parent
+
+    def __repr__(self):  # type: () -> str
+        return str(self.path)
+
+    @property
+    def relative_path(self):  # type: () -> Path
+        return self.path
+
+    def resolve(self):  # type: () -> Path
+        if self.parent:
+            return (self.parent / self.path).resolve()
+        return self.path.resolve()

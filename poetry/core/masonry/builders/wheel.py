@@ -136,7 +136,7 @@ class WheelBuilder(Builder):
         # Walk the files and compress them,
         # sorting everything so the order is stable.
         for file in sorted(to_add, key=lambda x: x.path):
-            self._add_file(wheel, file.full_path, file.rel_path)
+            self._add_file(wheel, file.resolve(), file.relative_path)
 
     def _write_metadata(self, wheel):
         if (
