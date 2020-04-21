@@ -309,15 +309,15 @@ class SdistBuilder(Builder):
 
         # Include project files
         logger.debug(" - Adding: pyproject.toml")
-        to_add.append(
-            BuildIncludeFile(path=Path("pyproject.toml"), parent=self._path)
-        )
+        to_add.append(BuildIncludeFile(path=Path("pyproject.toml"), parent=self._path))
 
         # If a license file exists, add it
         for license_file in self._path.glob("LICENSE*"):
             logger.debug(" - Adding: {}".format(license_file.relative_to(self._path)))
             to_add.append(
-                BuildIncludeFile(path=license_file.relative_to(self._path), parent=self._path)
+                BuildIncludeFile(
+                    path=license_file.relative_to(self._path), parent=self._path
+                )
             )
 
         # If a README is specified we need to include it to avoid errors
@@ -326,7 +326,9 @@ class SdistBuilder(Builder):
             if readme.exists():
                 logger.debug(" - Adding: {}".format(readme.relative_to(self._path)))
                 to_add.append(
-                    BuildIncludeFile(path=readme.relative_to(self._path), parent=self._path)
+                    BuildIncludeFile(
+                        path=readme.relative_to(self._path), parent=self._path
+                    )
                 )
 
         return sorted(to_add, key=lambda x: x.path)
