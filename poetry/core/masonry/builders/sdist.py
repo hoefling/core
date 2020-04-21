@@ -22,7 +22,8 @@ from poetry.core.utils._compat import to_str
 
 from ..utils.helpers import normalize_file_permissions
 from ..utils.package_include import PackageInclude
-from .builder import Builder, BuildIncludeFile
+from .builder import Builder
+from .builder import BuildIncludeFile
 
 
 SETUP = """\

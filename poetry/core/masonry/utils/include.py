@@ -1,6 +1,8 @@
 from typing import List
 from typing import Optional
 
+from poetry.core.utils._compat import Path
+
 
 class Include(object):
     """
