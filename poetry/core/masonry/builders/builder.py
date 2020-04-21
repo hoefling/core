@@ -148,12 +148,12 @@ class Builder(object):
 
                 if file.is_dir():
                     if self.format in formats:
-                        for f in file.glob("**/*"):
-                            rel_path = f.relative_to(self._path)
+                        for current_file in file.glob("**/*"):
+                            rel_path = current_file.relative_to(self._path)
 
                             if (
                                 rel_path not in set([f.path for f in to_add])
-                                and not f.is_dir()
+                                and not current_file.is_dir()
                                 and not self.is_excluded(rel_path)
                             ):
                                 to_add.append(
